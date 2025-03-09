@@ -6,16 +6,16 @@ const fs = require("fs");
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN";
-const CHAT_ID = "YOUR_TELEGRAM_CHAT_ID";
+const BOT_TOKEN = "7575375182:AAHQeA5jdew2tMO5Znh9_zBqi4pwFnWUmCg";
+const CHAT_ID = "7081489041";
 
-let imageUrl = "https://example.com/default-image.jpg"; // Gambar default
+let imageUrl = "https://img12.pixhost.to/images/804/574487749_fikxzxmodz-developer.jpg"; // Gambar default
 
 app.use(express.static("public"));
 app.use(express.json());
 
 // API untuk mengubah gambar tampilan
-app.post("/set-image", (req, res) => {
+app.post("/setimg", (req, res) => {
     if (req.body.imageUrl) {
         imageUrl = req.body.imageUrl;
         res.json({ success: true, message: "Gambar berhasil diperbarui!" });
